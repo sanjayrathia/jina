@@ -1,3 +1,6 @@
+import os
+import time
+
 import pytest
 
 from jina.peapods.pods.factory import PodFactory
@@ -7,6 +10,9 @@ from jina import Flow, Executor, requests, Document, DocumentArray
 from jina.helper import random_port
 from jina.excepts import FlowTopologyError
 from tests import validate_callback
+
+
+cur_dir = os.path.dirname(os.path.abspath(__file__))
 
 
 def validate_response(resp):
@@ -346,5 +352,50 @@ def test_flow_with_external_pod_join(
         mock = mocker.Mock()
         with flow:
             flow.index(inputs=input_docs, on_done=mock)
+
+    validate_callback(mock, validate_response)
+
+
+@pytest.fixture()
+def docker_compose(request):
+    os.system(
+        f"docker-compose -f {request.param} --project-directory . up  --build -d --remove-orphans"
+    )
+    import docker
+
+    client = docker.from_env()
+    client.containers.get('test_remote_external_pod')
+    time.sleep(5)
+    yield client.containers.get('test_remote_external_pod').attrs['NetworkSettings'][
+        'Networks'
+    ]['jina_default']['IPAddress']
+    os.system(
+        f"docker-compose -f {request.param} --project-directory . down --remove-orphans"
+    )
+
+
+@pytest.mark.timeout(30)
+@pytest.mark.parametrize(
+    'docker_compose',
+    [os.path.join(cur_dir, 'docker-compose.yml')],
+    indirect=['docker_compose'],
+)
+def test_flow_with_remote_external_pod(docker_compose, input_docs, mocker):
+    flow = (
+        Flow()
+        .add(name='pod0')
+        .add(
+            host_in=docker_compose,
+            port_in='45678',
+            name='external_docker_pod',
+            external=True,
+        )
+        .add(
+            name='pod1',
+        )
+    )
+    mock = mocker.Mock()
+    with flow:
+        flow.index(inputs=input_docs, on_done=mock)
 
     validate_callback(mock, validate_response)

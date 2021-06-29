@@ -1,0 +1,3 @@
+jtype: MyExternalExecutor
+metas:
+  py_modules: [executor.py]

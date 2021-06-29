@@ -1,0 +1,18 @@
+version: "3.3"
+services:
+  jina:
+    image: test_remote_external_pod
+    container_name: test_remote_external_pod
+    entrypoint: jina
+    command: pod --uses executor.yml --name external_real_2 --port-in 45678 --host-in 0.0.0.0
+    build:
+      context: .
+      dockerfile: Dockerfiles/debianx.Dockerfile
+    ports:
+      - "45678:45678"
+    volumes:
+      - ./tests/integration/external_pod/executor.yml:/executor.yml
+      - ./tests/integration/external_pod/executor.py:/executor.py
+    environment:
+      - JINA_LOG_LEVEL=DEBUG
+    #network_mode: host
